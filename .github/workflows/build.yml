@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    container: python:3.11
 
     steps:
     - name: Checkout code
@@ -18,6 +19,7 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        allow-prereleases: true
 
     - name: Install dependencies
       run: |
@@ -26,10 +28,24 @@ jobs:
 
     - name: Build EXE
       run: |
-        pyinstaller --name="手术视频标注系统" --onedir --clean --noconfirm launcher.py
-        copy annotation_app.py dist\手术视频标注系统\
-        copy config.json dist\手术视频标注系统\
-        if not exist "dist\手术视频标注系统\videos" mkdir dist\手术视频标注系统\videos
+        # 清理之前的构建
+        rm -rf dist/手术视频标注系统
+
+        # 使用 PyInstaller 打包
+        pyinstaller \
+          --name="手术视频标注系统" \
+          --onedir \
+          --clean \
+          --noconfirm \
+          launcher.py
+
+        # 复制额外文件
+        mkdir -p dist/手术视频标注系统
+        cp annotation_app.py dist/手术视频标注系统/
+        cp config.json dist/手术视频标注系统/
+
+        # 确保 videos 目录存在
+        mkdir -p dist/手术视频标注系统/videos
 
     - name: Create ZIP archive
       run: |
@@ -42,10 +58,11 @@ jobs:
         name: windows-exe
         path: dist/手术视频标注系统.zip
 
-    - name: Create Release
+    - name: Create Release (if tagged)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
         files: dist/手术视频标注系统.zip
+        tag_name: ${{ github.ref }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
