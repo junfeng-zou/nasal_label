@@ -1,0 +1,370 @@
+"""
+鼻内镜手术视频标注系统
+专为医学专业人士设计的轻量化标注工具
+"""
+
+import streamlit as st
+import json
+import os
+from pathlib import Path
+from datetime import datetime
+
+# 页面配置
+st.set_page_config(
+    page_title="鼻内镜手术视频标注系统",
+    page_icon="🏥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 自定义样式
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #1f77b4;
+        text-align: center;
+        margin-bottom: 1rem;
+        font-weight: bold;
+    }
+    .section-header {
+        font-size: 1.3rem;
+        color: #333;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+        padding-bottom: 0.3rem;
+        border-bottom: 2px solid #1f77b4;
+    }
+    .category-label {
+        font-size: 1rem;
+        color: #555;
+        font-weight: 600;
+        margin-top: 0.8rem;
+        margin-bottom: 0.3rem;
+    }
+    .video-container {
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 15px;
+        background-color: #f9f9f9;
+        margin-bottom: 1rem;
+    }
+    .annotation-container {
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 15px;
+        background-color: #ffffff;
+    }
+    .risk-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    .risk-item {
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #fafafa;
+    }
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 12px 28px;
+        text-align: center;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 5px;
+        width: 100%;
+    }
+    .stButton>button:hover {
+        background-color: #45a049;
+    }
+    div[data-baseweb="select"] > div {
+        background-color: #f0f0f0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+def load_config():
+    """加载配置文件"""
+    config_path = Path(__file__).parent / "config.json"
+    if config_path.exists():
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    else:
+        st.error("配置文件 config.json 不存在！")
+        st.stop()
+
+
+def scan_videos():
+    """扫描视频目录"""
+    video_dir = Path(__file__).parent / "videos"
+    video_dir.mkdir(exist_ok=True)
+
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
+    videos = []
+
+    for file in video_dir.iterdir():
+        if file.suffix.lower() in video_extensions:
+            videos.append(file.name)
+
+    return sorted(videos)
+
+
+def load_annotations():
+    """加载已有的标注数据"""
+    annotation_file = Path(__file__).parent / "annotations.json"
+    if annotation_file.exists():
+        with open(annotation_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+
+def save_annotation(video_name, annotations):
+    """保存单个视频的标注数据"""
+    all_annotations = load_annotations()
+    all_annotations[video_name] = {
+        "annotations": annotations,
+        "annotated_at": datetime.now().isoformat()
+    }
+
+    annotation_file = Path(__file__).parent / "annotations.json"
+    with open(annotation_file, 'w', encoding='utf-8') as f:
+        json.dump(all_annotations, f, ensure_ascii=False, indent=2)
+
+
+def initialize_session_state():
+    """初始化会话状态"""
+    if 'current_video_index' not in st.session_state:
+        st.session_state.current_video_index = 0
+
+    if 'config' not in st.session_state:
+        st.session_state.config = load_config()
+
+    if 'videos' not in st.session_state:
+        st.session_state.videos = scan_videos()
+
+
+def render_annotation_section(config, current_annotations):
+    """渲染标注区域"""
+    categories = config['categories']
+
+    video_annotations = {}
+
+    # 第一部分：图像质量
+    st.markdown('<div class="section-header">📷 图像质量</div>', unsafe_allow_html=True)
+    cat = categories['图像质量']
+    video_annotations['图像质量'] = st.selectbox(
+        "选择图像质量状态",
+        cat['options'],
+        index=cat['options'].index(current_annotations.get('图像质量', cat['options'][0])) if current_annotations.get('图像质量') in cat['options'] else 0,
+        key='img_quality'
+    )
+
+    # 第二部分：离器械距离
+    st.markdown('<div class="section-header">📏 离器械距离</div>', unsafe_allow_html=True)
+    cat = categories['离器械距离']
+    video_annotations['离器械距离'] = st.selectbox(
+        "选择距离评估",
+        cat['options'],
+        index=cat['options'].index(current_annotations.get('离器械距离', cat['options'][2])) if current_annotations.get('离器械距离') in cat['options'] else 2,
+        key='distance'
+    )
+
+    # 第三部分：腔壁风险 - 使用网格布局
+    st.markdown('<div class="section-header">⚠️ 腔壁风险评估</div>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # 左侧
+        cat = categories['腔壁风险-左侧']
+        video_annotations['腔壁风险-左侧'] = st.selectbox(
+            "⬅️ 左侧",
+            cat['options'],
+            index=cat['options'].index(current_annotations.get('腔壁风险-左侧', cat['options'][2])) if current_annotations.get('腔壁风险-左侧') in cat['options'] else 2,
+            key='risk_left'
+        )
+
+        # 上方
+        cat = categories['腔壁风险-上方']
+        video_annotations['腔壁风险-上方'] = st.selectbox(
+            "⬆️ 上方",
+            cat['options'],
+            index=cat['options'].index(current_annotations.get('腔壁风险-上方', cat['options'][2])) if current_annotations.get('腔壁风险-上方') in cat['options'] else 2,
+            key='risk_top'
+        )
+
+    with col2:
+        # 右侧
+        cat = categories['腔壁风险-右侧']
+        video_annotations['腔壁风险-右侧'] = st.selectbox(
+            "➡️ 右侧",
+            cat['options'],
+            index=cat['options'].index(current_annotations.get('腔壁风险-右侧', cat['options'][2])) if current_annotations.get('腔壁风险-右侧') in cat['options'] else 2,
+            key='risk_right'
+        )
+
+        # 下方
+        cat = categories['腔壁风险-下方']
+        video_annotations['腔壁风险-下方'] = st.selectbox(
+            "⬇️ 下方",
+            cat['options'],
+            index=cat['options'].index(current_annotations.get('腔壁风险-下方', cat['options'][2])) if current_annotations.get('腔壁风险-下方') in cat['options'] else 2,
+            key='risk_bottom'
+        )
+
+    # 备注
+    st.markdown('<div class="section-header">📝 备注</div>', unsafe_allow_html=True)
+    video_annotations['备注'] = st.text_area(
+        "补充说明（可选）",
+        value=current_annotations.get('备注', ''),
+        height=80,
+        placeholder="输入其他需要记录的信息...",
+        key='notes'
+    )
+
+    return video_annotations
+
+
+def main():
+    """主函数"""
+    initialize_session_state()
+
+    # 标题
+    st.markdown('<div class="main-header">🏥 鼻内镜手术视频标注系统</div>', unsafe_allow_html=True)
+
+    # 检查视频文件
+    if len(st.session_state.videos) == 0:
+        st.error("⚠️ 未找到视频文件！")
+        st.info("""
+        **使用说明：**
+        1. 在当前目录下创建 `videos` 文件夹
+        2. 将手术视频文件放入该文件夹
+        3. 重新启动程序
+
+        支持的视频格式：MP4, AVI, MOV, MKV, WMV
+        """)
+        return
+
+    # 侧边栏
+    with st.sidebar:
+        st.header("📊 标注进度")
+
+        all_annotations = load_annotations()
+        total_videos = len(st.session_state.videos)
+        annotated_count = len(all_annotations)
+        progress = annotated_count / total_videos if total_videos > 0 else 0
+
+        st.metric("总视频数", total_videos)
+        st.metric("已标注", annotated_count)
+        st.metric("完成率", f"{progress:.1%}")
+
+        st.progress(progress)
+
+        st.markdown("---")
+        st.header("🎬 视频导航")
+
+        selected_video = st.selectbox(
+            "选择视频",
+            st.session_state.videos,
+            index=st.session_state.current_video_index
+        )
+
+        st.session_state.current_video_index = st.session_state.videos.index(selected_video)
+
+        st.markdown("---")
+        st.header("ℹ️ 标注说明")
+        st.markdown("""
+        **标注维度：**
+        1. **图像质量**：清晰/模糊/遮挡
+        2. **离器械距离**：太远~太近（5级）
+        3. **腔壁风险**：四个方向，各三级
+
+        **操作流程：**
+        1. 观看视频
+        2. 选择各项标注
+        3. 点击保存
+        """)
+
+    # 主内容区 - 左右布局
+    col_video, col_anno = st.columns([3, 2])
+
+    with col_video:
+        # 视频播放区
+        video_path = Path(__file__).parent / "videos" / selected_video
+        st.markdown('<div class="video-container">', unsafe_allow_html=True)
+        st.subheader(f"🎥 {selected_video}")
+
+        if video_path.exists():
+            with open(video_path, 'rb') as video_file:
+                video_bytes = video_file.read()
+                st.video(video_bytes)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_anno:
+        # 标注区
+        st.markdown('<div class="annotation-container">', unsafe_allow_html=True)
+        st.subheader("📝 标注信息")
+
+        current_annotations = all_annotations.get(selected_video, {}).get('annotations', {})
+
+        video_annotations = render_annotation_section(st.session_state.config, current_annotations)
+
+        st.markdown("---")
+
+        # 保存按钮
+        if st.button("💾 保存标注"):
+            save_annotation(selected_video, video_annotations)
+            st.success(f"✅ 标注已保存！")
+            st.rerun()
+
+        # 显示最后保存时间
+        if selected_video in all_annotations:
+            saved_time = all_annotations[selected_video]['annotated_at']
+            st.caption(f"最后保存：{datetime.fromisoformat(saved_time).strftime('%Y-%m-%d %H:%M:%S')}")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # 底部导航按钮
+    st.markdown("---")
+    col1, col2, col3, col4, col5 = st.columns([1.5, 1.5, 2, 1.5, 1.5])
+
+    with col1:
+        if st.button("⏮️ 上一个", use_container_width=True):
+            if st.session_state.current_video_index > 0:
+                st.session_state.current_video_index -= 1
+                st.rerun()
+
+    with col2:
+        st.info(f"**第 {st.session_state.current_video_index + 1} / {total_videos} 个**")
+
+    with col3:
+        # 快速状态概览
+        if selected_video in all_annotations:
+            st.success("✅ 已标注")
+        else:
+            st.warning("⏳ 待标注")
+
+    with col4:
+        if st.button("下一个 ⏭️", use_container_width=True):
+            if st.session_state.current_video_index < total_videos - 1:
+                st.session_state.current_video_index += 1
+                st.rerun()
+
+    with col5:
+        unannotated = [v for v in st.session_state.videos if v not in all_annotations]
+        if unannotated:
+            if st.button("⏩ 下个未标注", use_container_width=True):
+                next_video = unannotated[0]
+                st.session_state.current_video_index = st.session_state.videos.index(next_video)
+                st.rerun()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,41 @@
+{
+  "categories": {
+    "图像质量": {
+      "type": "single",
+      "options": ["清晰", "模糊", "遮挡"],
+      "description": "当前帧的图像清晰度情况"
+    },
+    "离器械距离": {
+      "type": "single",
+      "options": ["太远", "比较远", "合适", "比较近", "太近"],
+      "description": "镜头与手术器械的距离评估"
+    },
+    "腔壁风险-左侧": {
+      "type": "single",
+      "options": ["危险", "警告", "安全"],
+      "description": "左侧腔壁的安全状态"
+    },
+    "腔壁风险-右侧": {
+      "type": "single",
+      "options": ["危险", "警告", "安全"],
+      "description": "右侧腔壁的安全状态"
+    },
+    "腔壁风险-上方": {
+      "type": "single",
+      "options": ["危险", "警告", "安全"],
+      "description": "上方腔壁的安全状态"
+    },
+    "腔壁风险-下方": {
+      "type": "single",
+      "options": ["危险", "警告", "安全"],
+      "description": "下方腔壁的安全状态"
+    }
+  },
+  "instructions": {
+    "title": "鼻内镜手术视频标注指南",
+    "version": "1.0",
+    "author": "医学影像标注团队",
+    "last_updated": "2026-06-29",
+    "annotation_type": "single_select"
+  }
+}
