@@ -3,19 +3,21 @@
 使用 PyInstaller 打包为 .exe
 
 使用方法：
-    python build_exe.py  # 在 Windows 上运行此脚本打包
-    dist/手术视频标注系统.exe  # 打包后的可执行文件
+    python build.py  # 在 Windows 上运行此脚本打包
+    dist/手术视频标注系统/手术视频标注系统.exe  # 打包后的可执行文件
 """
 
 import os
 import sys
-import subprocess
+import threading
 import time
+import urllib.request
 import webbrowser
 from pathlib import Path
 
-# 获取当前目录
-CURRENT_DIR = Path(__file__).parent if not hasattr(sys, '_MEIPASS') else Path(sys._MEIPASS)
+# 获取程序和资源目录
+BUNDLE_DIR = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
+RUNTIME_DIR = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else BUNDLE_DIR
 
 
 def find_free_port():
@@ -27,29 +29,21 @@ def find_free_port():
         return s.getsockname()[1]
 
 
-def get_python_executable():
-    """获取 Python 解释器路径"""
-    if hasattr(sys, '_MEIPASS'):
-        # PyInstaller 打包后，需要找到嵌入式 Python
-        # PyInstaller 会将 Python 带到 dist 目录
-        base_dir = Path(sys._MEIPASS)
+def open_browser_when_ready(url, timeout=30):
+    """等待 Streamlit 服务就绪后打开一次浏览器"""
+    health_url = f"{url}/_stcore/health"
+    deadline = time.time() + timeout
 
-        # 可能的 Python 位置
-        possible_paths = [
-            base_dir / 'python.exe',
-            base_dir / 'python3.exe',
-            Path(sys.executable).parent / 'python.exe',
-        ]
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(health_url, timeout=1) as response:
+                if response.status == 200:
+                    webbrowser.open(url)
+                    return
+        except Exception:
+            time.sleep(0.5)
 
-        for path in possible_paths:
-            if path.exists():
-                return str(path)
-
-        # 如果都找不到，尝试使用 sys.executable 的父目录
-        return str(Path(sys.executable).parent / 'python.exe')
-    else:
-        # 开发环境
-        return sys.executable
+    print(f"浏览器未能自动打开，请手动访问: {url}")
 
 
 def start_streamlit():
@@ -57,18 +51,13 @@ def start_streamlit():
     port = find_free_port()
 
     # 应用文件路径
-    if hasattr(sys, '_MEIPASS'):
-        # 打包后的路径
-        app_path = Path(sys._MEIPASS) / 'annotation_app.py'
-        work_dir = Path(sys.executable).parent
-    else:
-        # 开发环境
-        app_path = CURRENT_DIR / 'annotation_app.py'
-        work_dir = CURRENT_DIR
+    app_path = BUNDLE_DIR / 'annotation_app.py'
+    work_dir = RUNTIME_DIR
 
     # 确保 videos 目录存在
     videos_dir = work_dir / 'videos'
     videos_dir.mkdir(exist_ok=True)
+    os.environ['NASAL_LABEL_DATA_DIR'] = str(work_dir)
 
     print(f"\n正在启动服务器...")
     print(f"访问地址：http://localhost:{port}")
@@ -77,51 +66,8 @@ def start_streamlit():
     # 设置工作目录
     os.chdir(work_dir)
 
-    # 启动 Streamlit
-    python_exe = get_python_executable()
-    print(f"Python 路径: {python_exe}")
-
-    cmd = [
-        python_exe,
-        '-m', 'streamlit', 'run',
-        str(app_path),
-        '--server.port', str(port),
-        '--server.headless', 'true',
-        '--browser.gatherUsageStats', 'false',
-        '--server.fileWatcherType', 'none'
-    ]
-
-    try:
-        process = subprocess.Popen(cmd)
-    except Exception as e:
-        print(f"\n错误: 无法启动服务器")
-        print(f"原因: {e}")
-        print("\n按任意键退出...")
-        input()
-        sys.exit(1)
-
-    # 等待服务启动
-    max_wait = 10
-    print(f"\n等待服务器启动...")
-    for i in range(max_wait):
-        time.sleep(1)
-        print(f"  {i+1}/{max_wait} 秒...")
-        # 检查进程是否还活着
-        if process.poll() is not None:
-            print(f"\n错误: 服务器意外退出 (退出码: {process.returncode})")
-            print("按任意键退出...")
-            input()
-            sys.exit(1)
-
     url = f"http://localhost:{port}"
-
-    # 打开浏览器
-    print(f"\n正在打开浏览器: {url}")
-    try:
-        webbrowser.open(url)
-    except Exception as e:
-        print(f"无法自动打开浏览器: {e}")
-        print(f"请手动访问: {url}")
+    print(f"\n等待服务器启动，稍后将打开浏览器: {url}")
 
     print("\n" + "=" * 50)
     print("  手术视频标注系统已启动！")
@@ -129,13 +75,34 @@ def start_streamlit():
     print("  关闭此窗口将退出程序")
     print("=" * 50)
 
-    # 保持进程运行直到用户关闭
     try:
-        process.wait()
+        from streamlit.web import cli as stcli
+
+        threading.Thread(
+            target=open_browser_when_ready,
+            args=(url,),
+            daemon=True
+        ).start()
+
+        sys.argv = [
+            'streamlit',
+            'run',
+            str(app_path),
+            f'--server.port={port}',
+            '--server.headless=true',
+            '--browser.gatherUsageStats=false',
+            '--server.fileWatcherType=none',
+            '--global.developmentMode=false',
+        ]
+        stcli.main()
     except KeyboardInterrupt:
         print("\n正在关闭程序...")
-        process.terminate()
-        process.wait()
+    except Exception as e:
+        print(f"\n错误: 无法启动服务器")
+        print(f"原因: {e}")
+        print("\n按任意键退出...")
+        input()
+        sys.exit(1)
 
 
 if __name__ == '__main__':

@@ -6,8 +6,31 @@
 import streamlit as st
 import json
 import os
+import sys
 from pathlib import Path
 from datetime import datetime
+
+
+def get_bundle_dir():
+    """返回应用资源所在目录"""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent
+
+
+def get_data_dir():
+    """返回可写数据目录，打包后为 exe 同级目录"""
+    data_dir = os.environ.get('NASAL_LABEL_DATA_DIR')
+    if data_dir:
+        path = Path(data_dir)
+    else:
+        path = get_bundle_dir()
+    path.mkdir(exist_ok=True)
+    return path
+
+
+BUNDLE_DIR = get_bundle_dir()
+DATA_DIR = get_data_dir()
 
 # 页面配置
 st.set_page_config(
@@ -91,7 +114,10 @@ st.markdown("""
 
 def load_config():
     """加载配置文件"""
-    config_path = Path(__file__).parent / "config.json"
+    config_path = DATA_DIR / "config.json"
+    if not config_path.exists():
+        config_path = BUNDLE_DIR / "config.json"
+
     if config_path.exists():
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -102,7 +128,7 @@ def load_config():
 
 def scan_videos():
     """扫描视频目录"""
-    video_dir = Path(__file__).parent / "videos"
+    video_dir = DATA_DIR / "videos"
     video_dir.mkdir(exist_ok=True)
 
     video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
@@ -117,7 +143,7 @@ def scan_videos():
 
 def load_annotations():
     """加载已有的标注数据"""
-    annotation_file = Path(__file__).parent / "annotations.json"
+    annotation_file = DATA_DIR / "annotations.json"
     if annotation_file.exists():
         with open(annotation_file, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -132,7 +158,7 @@ def save_annotation(video_name, annotations):
         "annotated_at": datetime.now().isoformat()
     }
 
-    annotation_file = Path(__file__).parent / "annotations.json"
+    annotation_file = DATA_DIR / "annotations.json"
     with open(annotation_file, 'w', encoding='utf-8') as f:
         json.dump(all_annotations, f, ensure_ascii=False, indent=2)
 
@@ -296,7 +322,7 @@ def main():
 
     with col_video:
         # 视频播放区
-        video_path = Path(__file__).parent / "videos" / selected_video
+        video_path = DATA_DIR / "videos" / selected_video
         st.markdown('<div class="video-container">', unsafe_allow_html=True)
         st.subheader(f"🎥 {selected_video}")
 

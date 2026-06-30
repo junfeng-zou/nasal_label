@@ -19,10 +19,19 @@ from pathlib import Path
 def install_dependencies():
     """安装打包所需的依赖"""
     print("安装打包依赖...")
-    subprocess.run([
-        sys.executable, '-m', 'pip', 'install',
-        'pyinstaller', 'streamlit', 'pandas'
-    ], check=True)
+    subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'], check=True)
+
+    requirements = Path('requirements.txt')
+    if requirements.exists():
+        subprocess.run([
+            sys.executable, '-m', 'pip', 'install',
+            '-r', str(requirements), 'pyinstaller'
+        ], check=True)
+    else:
+        subprocess.run([
+            sys.executable, '-m', 'pip', 'install',
+            'pyinstaller', 'streamlit', 'pandas'
+        ], check=True)
 
 
 def build_exe():
@@ -38,17 +47,30 @@ def build_exe():
     ], check=True)
 
     print("\n打包完成！")
-    print(f"输出文件：dist/手术视频标注系统.exe")
+    print(f"输出目录：dist/手术视频标注系统")
+    print(f"主程序：dist/手术视频标注系统/手术视频标注系统.exe")
 
 
 def copy_to_dist():
     """复制必要的文件到输出目录"""
-    dist_dir = Path('dist')
-    dist_dir.mkdir(exist_ok=True)
+    dist_dir = Path('dist') / '手术视频标注系统'
+    dist_dir.mkdir(parents=True, exist_ok=True)
 
     # 创建 videos 目录
     videos_dir = dist_dir / 'videos'
     videos_dir.mkdir(exist_ok=True)
+
+    config_file = Path('config.json')
+    if config_file.exists():
+        shutil.copy2(config_file, dist_dir / 'config.json')
+
+    readme_path = dist_dir / '使用说明.txt'
+    readme_path.write_text(
+        "双击“手术视频标注系统.exe”启动程序。\n"
+        "请将需要标注的视频放入同级 videos 文件夹。\n"
+        "标注结果会保存为同级 annotations.json。\n",
+        encoding='utf-8'
+    )
 
     print(f"输出目录：{dist_dir.absolute()}")
 
@@ -76,10 +98,10 @@ def main():
         print("  打包成功！")
         print("=" * 60)
         print("\n输出文件：")
-        print("  dist/手术视频标注系统.exe")
-        print("  dist/videos/  (将视频放入此目录)")
+        print("  dist/手术视频标注系统/手术视频标注系统.exe")
+        print("  dist/手术视频标注系统/videos/  (将视频放入此目录)")
         print("\n分发给医生：")
-        print("  1. 将 dist/ 目录压缩为 zip 文件")
+        print("  1. 将 dist/手术视频标注系统/ 目录压缩为 zip 文件")
         print("  2. 医生解压后，双击 手术视频标注系统.exe 即可运行")
 
     except Exception as e:
