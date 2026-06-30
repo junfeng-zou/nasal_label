@@ -40,21 +40,27 @@ def clean_build():
 
 def copy_files():
     """复制必要文件到输出目录"""
-    output = Path('build') / 'dist'
-    output.mkdir(parents=True, exist_ok=True)
+    output = Path('dist') / '手术视频标注系统'
 
-    # 复制主程序
+    if not output.exists():
+        print(f"错误: 输出目录不存在: {output}")
+        return None
+
+    # 复制配置文件
     src = Path(__file__).parent
-    dst = output / '手术视频标注系统.exe'
-    shutil.copy(src / 'launcher.py', dst)
-    shutil.copy(src / 'annotation_app.py', dst)
-    shutil.copy(src / 'config.json', dst)
 
-    # 复制 videos 目录
-    videos_src = src / 'videos'
+    files_to_copy = ['annotation_app.py', 'config.json']
+    for file in files_to_copy:
+        src_file = src / file
+        if src_file.exists():
+            shutil.copy2(src_file, output / file)
+            print(f"已复制: {file}")
+        else:
+            print(f"警告: 找不到 {file}")
+
+    # 确保 videos 目录存在
     videos_dst = output / 'videos'
-    if videos_src.exists():
-        shutil.copytree(videos_src, videos_dst)
+    videos_dst.mkdir(exist_ok=True)
 
     return output
 
