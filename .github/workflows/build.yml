@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows Package
 
 on:
   push:
@@ -25,20 +25,59 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller streamlit pandas
+        pip install streamlit pandas
 
-    - name: Build EXE
+    - name: Build package
       shell: pwsh
       run: |
-        # 使用 PyInstaller 打包
-        pyinstaller --name="手术视频标注系统" --onedir --clean --noconfirm launcher.py
+        # 创建输出目录
+        New-Item -ItemType Directory -Force -Path "dist\手术视频标注系统"
 
-        # 复制额外文件
+        # 复制应用文件
         Copy-Item annotation_app.py -Destination "dist\手术视频标注系统\"
         Copy-Item config.json -Destination "dist\手术视频标注系统\"
+        Copy-Item "启动系统.bat" -Destination "dist\手术视频标注系统\"
 
-        # 确保 videos 目录存在
+        # 创建 videos 目录
         New-Item -ItemType Directory -Force -Path "dist\手术视频标注系统\videos"
+
+        # 创建安装说明
+        $readme = @"
+# 手术视频标注系统 安装说明
+
+## 系统要求
+- Windows 10 或更高版本
+- Python 3.8 或更高版本
+
+## 安装步骤
+
+### 方法一：自动安装（推荐）
+1. 双击 启动系统.bat
+2. 程序会自动检测并安装依赖
+3. 安装完成后会自动打开浏览器
+
+### 方法二：手动安装
+1. 打开命令提示符（cmd）
+2. 进入此目录
+3. 运行以下命令：
+   pip install streamlit pandas
+   streamlit run annotation_app.py
+
+## 使用说明
+1. 启动后浏览器会自动打开系统
+2. 如未自动打开，手动访问 http://localhost:8501
+3. 关闭命令行窗口将退出程序
+
+## 常见问题
+
+Q: 提示找不到 Python
+A: 请先安装 Python：https://www.python.org/downloads/
+   安装时勾选 "Add Python to PATH"
+
+Q: 浏览器没有自动打开
+A: 手动在浏览器中访问 http://localhost:8501
+"@
+        $readme | Out-File -FilePath "dist\手术视频标注系统\安装说明.txt" -Encoding UTF8
 
     - name: Create ZIP archive
       shell: pwsh
@@ -48,7 +87,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: windows-exe
+        name: windows-package
         path: dist/手术视频标注系统.zip
 
     - name: Create Release
@@ -56,5 +95,18 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: dist/手术视频标注系统.zip
+        body: |
+          # 手术视频标注系统
+
+          ## 下载说明
+          下载 `手术视频标注系统.zip` 并解压
+
+          ## 使用方法
+          1. 确保已安装 Python 3.8+（下载地址：https://www.python.org/downloads/）
+          2. 双击 `启动系统.bat` 运行程序
+          3. 等待浏览器自动打开
+
+          ## 首次运行
+          首次运行会自动安装所需依赖（streamlit, pandas）
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
