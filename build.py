@@ -13,7 +13,18 @@
 import subprocess
 import sys
 import shutil
+import os
 from pathlib import Path
+
+
+def configure_utf8_output():
+    """确保 Windows CI 控制台可以输出中文日志"""
+    os.environ.setdefault('PYTHONUTF8', '1')
+    os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
 
 
 def install_dependencies():
@@ -110,4 +121,5 @@ def main():
 
 
 if __name__ == '__main__':
+    configure_utf8_output()
     main()
