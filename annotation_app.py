@@ -272,7 +272,7 @@ def render_tail_frame(video_path):
         tail_frame, error = extract_tail_frame(str(video_path), stat.st_mtime, stat.st_size)
 
     if tail_frame is not None:
-        st.image(tail_frame, caption="最后一个可解码画面", channels="RGB", use_column_width=True)
+        st.image(tail_frame, caption="最后一个可解码画面", channels="RGB", width="stretch")
     else:
         st.warning(error or "尾帧读取失败。")
 

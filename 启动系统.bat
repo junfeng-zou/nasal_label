@@ -18,19 +18,19 @@ if errorlevel 1 (
 
 REM 检查是否安装了必要的库
 echo [检查依赖...]
-python -c "import streamlit" >nul 2>&1
+python -c "import streamlit, cv2" >nul 2>&1
 if errorlevel 1 (
     echo 正在安装依赖...
-    pip install streamlit pandas
+    pip install -r requirements.txt
 )
 
-REM 启动 Streamlit
+REM 启动程序
 echo.
 echo [启动服务器...]
 echo 系统将在浏览器中自动打开
 echo 关闭此窗口将退出程序
 echo.
 
-streamlit run annotation_app.py --server.headless=false --browser.gatherUsageStats=false
+python launcher.py
 
 pause

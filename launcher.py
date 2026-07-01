@@ -20,6 +20,18 @@ BUNDLE_DIR = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 RUNTIME_DIR = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else BUNDLE_DIR
 
 
+def configure_windows_event_loop():
+    """减少 Windows Proactor 事件循环在连接断开时打印的噪声"""
+    if sys.platform != 'win32':
+        return
+
+    try:
+        import asyncio
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
+
+
 def find_free_port():
     """查找可用端口"""
     import socket
@@ -48,6 +60,7 @@ def open_browser_when_ready(url, timeout=30):
 
 def start_streamlit():
     """启动 Streamlit 服务"""
+    configure_windows_event_loop()
     port = find_free_port()
 
     # 应用文件路径

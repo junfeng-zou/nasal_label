@@ -52,11 +52,11 @@ if not exist "videos" (
     exit /b 0
 )
 
-REM 检查videos目录是否有视频文件
-dir /b videos\*.mp4 videos\*.avi videos\*.mov videos\*.mkv videos\*.wmv 2>nul | findstr . >nul
+REM 检查videos目录及子目录是否有视频文件
+dir /s /b videos\*.mp4 videos\*.avi videos\*.mov videos\*.mkv videos\*.wmv 2>nul | findstr . >nul
 if %errorlevel% neq 0 (
     echo [警告] videos文件夹中没有视频文件！
-    echo 请将手术视频文件放入 videos 文件夹
+    echo 请将手术视频文件放入 videos 文件夹或其子文件夹
     echo.
     pause
     exit /b 0
@@ -64,14 +64,13 @@ if %errorlevel% neq 0 (
 
 echo ============================================
 echo  程序已启动！
-echo  浏览器将自动打开，如未打开请访问：
-echo  http://localhost:8501
+echo  浏览器将自动打开，如未打开请查看下方控制台输出的访问地址
 echo ============================================
 echo.
 echo  关闭此窗口将退出程序
 echo.
 
-REM 启动Streamlit
-%PYTHON_CMD% -m streamlit run annotation_app.py --server.headless=false --browser.gatherUsageStats=false
+REM 启动程序
+%PYTHON_CMD% launcher.py
 
 pause
