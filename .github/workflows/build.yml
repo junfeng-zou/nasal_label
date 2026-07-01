@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '可选：填写 v1.0.3 这类版本号时，会同时创建 GitHub Release'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -39,27 +44,30 @@ jobs:
     - name: Create ZIP archive
       shell: pwsh
       run: |
-        if (Test-Path "dist\手术视频标注系统.zip") {
-          Remove-Item "dist\手术视频标注系统.zip" -Force
+        if (Test-Path "dist\nasal-label-windows.zip") {
+          Remove-Item "dist\nasal-label-windows.zip" -Force
         }
-        Compress-Archive -Path "dist\手术视频标注系统" -DestinationPath "dist\手术视频标注系统.zip"
+        Compress-Archive -Path "dist\手术视频标注系统" -DestinationPath "dist\nasal-label-windows.zip"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: windows-package
-        path: dist/手术视频标注系统.zip
+        name: nasal-label-windows
+        path: dist/nasal-label-windows.zip
+        compression-level: 0
 
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
+      if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/手术视频标注系统.zip
+        tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        target_commitish: ${{ github.sha }}
+        files: dist/nasal-label-windows.zip
         body: |
           # 手术视频标注系统
 
           ## 下载说明
-          下载 `手术视频标注系统.zip` 并解压。
+          下载 `nasal-label-windows.zip` 并解压。
 
           ## 使用方法
           1. 将需要标注的视频放入 `videos` 文件夹
