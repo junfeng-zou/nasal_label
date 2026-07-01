@@ -16,11 +16,7 @@ pyinstaller build.spec --clean --noconfirm
 # 4. 准备可写数据目录和配置文件
 cp config.json dist/手术视频标注系统/
 mkdir -p dist/手术视频标注系统/videos
-cat > dist/手术视频标注系统/使用说明.txt <<'EOF'
-双击“手术视频标注系统.exe”启动程序。
-请将需要标注的视频放入同级 videos 文件夹。
-标注结果会保存为同级 annotations.json。
-EOF
+cp 使用说明.txt dist/手术视频标注系统/
 
 # 5. 创建 zip 包
 cd dist

@@ -75,13 +75,9 @@ def copy_to_dist():
     if config_file.exists():
         shutil.copy2(config_file, dist_dir / 'config.json')
 
-    readme_path = dist_dir / '使用说明.txt'
-    readme_path.write_text(
-        "双击“手术视频标注系统.exe”启动程序。\n"
-        "请将需要标注的视频放入同级 videos 文件夹。\n"
-        "标注结果会保存为同级 annotations.json。\n",
-        encoding='utf-8'
-    )
+    usage_file = Path('使用说明.txt')
+    if usage_file.exists():
+        shutil.copy2(usage_file, dist_dir / '使用说明.txt')
 
     print(f"输出目录：{dist_dir.absolute()}")
 
