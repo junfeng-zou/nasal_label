@@ -34,6 +34,30 @@ DATA_DIR = get_data_dir()
 MAX_VIDEO_SCAN_DEPTH = 3
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv'}
 TAIL_FRAME_SEEK_OFFSETS = (1, 2, 5, 10, 30, 60, 120)
+LEGACY_VALUE_MAPS = {
+    '内窥镜距器械距离': {
+        '太近': '过近',
+        '比较近': '过近',
+        '合适': '合适',
+        '比较远': '过远',
+        '太远': '过远',
+    },
+    '距左腔壁': {
+        '危险': '即将接触',
+        '警告': '靠近',
+        '安全': '合适',
+    },
+    '距右腔壁': {
+        '危险': '即将接触',
+        '警告': '靠近',
+        '安全': '合适',
+    },
+}
+LEGACY_FIELD_NAMES = {
+    '内窥镜距器械距离': '离器械距离',
+    '距左腔壁': '腔壁风险-左侧',
+    '距右腔壁': '腔壁风险-右侧',
+}
 
 # 页面配置
 st.set_page_config(
@@ -249,6 +273,38 @@ def render_tail_frame(video_path):
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def get_annotation_value(annotations, field_name, default_value):
+    """读取新字段，并尽量兼容旧标注字段"""
+    if field_name in annotations:
+        return annotations[field_name]
+
+    legacy_field = LEGACY_FIELD_NAMES.get(field_name)
+    if not legacy_field:
+        return default_value
+
+    legacy_value = annotations.get(legacy_field)
+    return LEGACY_VALUE_MAPS.get(field_name, {}).get(legacy_value, default_value)
+
+
+def widget_key(video_name, field_key):
+    """为每个视频生成独立控件 key，避免切换视频时复用旧状态"""
+    return f"{video_name}::{field_key}"
+
+
+def select_annotation(field_name, label, category, annotations, default_value, key):
+    """渲染单选标注项"""
+    options = category['options']
+    current_value = get_annotation_value(annotations, field_name, default_value)
+    index = options.index(current_value) if current_value in options else options.index(default_value)
+
+    return st.selectbox(
+        label,
+        options,
+        index=index,
+        key=key
+    )
+
+
 def initialize_session_state():
     """初始化会话状态"""
     if 'current_video_index' not in st.session_state:
@@ -261,7 +317,7 @@ def initialize_session_state():
         st.session_state.videos = scan_videos()
 
 
-def render_annotation_section(config, current_annotations):
+def render_annotation_section(config, current_annotations, selected_video):
     """渲染标注区域"""
     categories = config['categories']
 
@@ -274,61 +330,59 @@ def render_annotation_section(config, current_annotations):
         "选择图像质量状态",
         cat['options'],
         index=cat['options'].index(current_annotations.get('图像质量', cat['options'][0])) if current_annotations.get('图像质量') in cat['options'] else 0,
-        key='img_quality'
+        key=widget_key(selected_video, 'img_quality')
     )
 
-    # 第二部分：离器械距离
-    st.markdown('<div class="section-header">📏 离器械距离</div>', unsafe_allow_html=True)
-    cat = categories['离器械距离']
-    video_annotations['离器械距离'] = st.selectbox(
+    # 第二部分：内窥镜距器械距离
+    st.markdown('<div class="section-header">📏 内窥镜距器械距离</div>', unsafe_allow_html=True)
+    cat = categories['内窥镜距器械距离']
+    video_annotations['内窥镜距器械距离'] = select_annotation(
+        '内窥镜距器械距离',
         "选择距离评估",
-        cat['options'],
-        index=cat['options'].index(current_annotations.get('离器械距离', cat['options'][2])) if current_annotations.get('离器械距离') in cat['options'] else 2,
-        key='distance'
+        cat,
+        current_annotations,
+        '合适',
+        widget_key(selected_video, 'distance')
     )
 
-    # 第三部分：腔壁风险 - 使用网格布局
-    st.markdown('<div class="section-header">⚠️ 腔壁风险评估</div>', unsafe_allow_html=True)
+    # 第三部分：内窥镜压迫腔壁风险
+    st.markdown('<div class="section-header">⚠️ 内窥镜压迫腔壁的风险评估</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        # 左侧
-        cat = categories['腔壁风险-左侧']
-        video_annotations['腔壁风险-左侧'] = st.selectbox(
-            "⬅️ 左侧",
-            cat['options'],
-            index=cat['options'].index(current_annotations.get('腔壁风险-左侧', cat['options'][2])) if current_annotations.get('腔壁风险-左侧') in cat['options'] else 2,
-            key='risk_left'
-        )
-
-        # 上方
-        cat = categories['腔壁风险-上方']
-        video_annotations['腔壁风险-上方'] = st.selectbox(
-            "⬆️ 上方",
-            cat['options'],
-            index=cat['options'].index(current_annotations.get('腔壁风险-上方', cat['options'][2])) if current_annotations.get('腔壁风险-上方') in cat['options'] else 2,
-            key='risk_top'
+        cat = categories['距左腔壁']
+        video_annotations['距左腔壁'] = select_annotation(
+            '距左腔壁',
+            "⬅️ 距左腔壁",
+            cat,
+            current_annotations,
+            '合适',
+            widget_key(selected_video, 'risk_left')
         )
 
     with col2:
-        # 右侧
-        cat = categories['腔壁风险-右侧']
-        video_annotations['腔壁风险-右侧'] = st.selectbox(
-            "➡️ 右侧",
-            cat['options'],
-            index=cat['options'].index(current_annotations.get('腔壁风险-右侧', cat['options'][2])) if current_annotations.get('腔壁风险-右侧') in cat['options'] else 2,
-            key='risk_right'
+        cat = categories['距右腔壁']
+        video_annotations['距右腔壁'] = select_annotation(
+            '距右腔壁',
+            "➡️ 距右腔壁",
+            cat,
+            current_annotations,
+            '合适',
+            widget_key(selected_video, 'risk_right')
         )
 
-        # 下方
-        cat = categories['腔壁风险-下方']
-        video_annotations['腔壁风险-下方'] = st.selectbox(
-            "⬇️ 下方",
-            cat['options'],
-            index=cat['options'].index(current_annotations.get('腔壁风险-下方', cat['options'][2])) if current_annotations.get('腔壁风险-下方') in cat['options'] else 2,
-            key='risk_bottom'
-        )
+    # 第四部分：上下方向偏移
+    st.markdown('<div class="section-header">↕️ 上下方向偏移</div>', unsafe_allow_html=True)
+    cat = categories['上下方向偏移']
+    video_annotations['上下方向偏移'] = select_annotation(
+        '上下方向偏移',
+        "选择上下方向偏移状态",
+        cat,
+        current_annotations,
+        '合适',
+        widget_key(selected_video, 'vertical_offset')
+    )
 
     # 备注
     st.markdown('<div class="section-header">📝 备注</div>', unsafe_allow_html=True)
@@ -337,7 +391,7 @@ def render_annotation_section(config, current_annotations):
         value=current_annotations.get('备注', ''),
         height=80,
         placeholder="输入其他需要记录的信息...",
-        key='notes'
+        key=widget_key(selected_video, 'notes')
     )
 
     return video_annotations
@@ -394,8 +448,9 @@ def main():
         st.markdown("""
         **标注维度：**
         1. **图像质量**：清晰/模糊/遮挡
-        2. **离器械距离**：太远~太近（5级）
-        3. **腔壁风险**：四个方向，各三级
+        2. **内窥镜距器械距离**：过近/合适/过远
+        3. **内窥镜压迫腔壁的风险评估**：距左腔壁/距右腔壁
+        4. **上下方向偏移**：过于偏上/过于偏下/合适
 
         **操作流程：**
         1. 观看视频
@@ -427,7 +482,7 @@ def main():
 
         current_annotations = all_annotations.get(selected_video, {}).get('annotations', {})
 
-        video_annotations = render_annotation_section(st.session_state.config, current_annotations)
+        video_annotations = render_annotation_section(st.session_state.config, current_annotations, selected_video)
 
         st.markdown("---")
 
