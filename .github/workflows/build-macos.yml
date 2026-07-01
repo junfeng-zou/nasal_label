@@ -1,0 +1,97 @@
+name: Build macOS App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '可选：填写 v1.0.3 这类版本号时，会同时创建 GitHub Release'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+            zip_name: nasal-label-macos-arm64.zip
+          - runner: macos-15-intel
+            arch: intel
+            zip_name: nasal-label-macos-intel.zip
+
+    runs-on: ${{ matrix.runner }}
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build macOS app
+        run: |
+          python build_macos.py
+          test -d "dist/手术视频标注系统-macOS/手术视频标注系统.app"
+
+      - name: Create ZIP archive
+        run: |
+          rm -f "dist/${{ matrix.zip_name }}"
+          ditto -c -k --sequesterRsrc --keepParent "dist/手术视频标注系统-macOS" "dist/${{ matrix.zip_name }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nasal-label-macos-${{ matrix.arch }}
+          path: dist/${{ matrix.zip_name }}
+          compression-level: 0
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nasal-label-macos-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          files: dist/*.zip
+          body: |
+            # 手术视频标注系统 macOS
+
+            ## 下载说明
+            - Apple Silicon Mac：下载 `nasal-label-macos-arm64.zip`
+            - Intel Mac：下载 `nasal-label-macos-intel.zip`
+
+            ## 使用方法
+            1. 解压 zip
+            2. 将需要标注的视频放入 `videos` 文件夹
+            3. 双击 `手术视频标注系统.app`
+            4. 如果 macOS 阻止打开，请查看压缩包内的 `macOS打开说明.txt`
+
+            ## 输出数据
+            标注结果会保存到同级 `annotations.json`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

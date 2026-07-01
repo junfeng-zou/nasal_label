@@ -15,9 +15,58 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+def get_bundle_dir():
+    """返回 PyInstaller 资源目录或源码目录"""
+    return Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)).resolve()
+
+
+def get_macos_app_bundle():
+    """如果当前在 macOS .app 内运行，返回 .app bundle 路径"""
+    if sys.platform != 'darwin' or not getattr(sys, 'frozen', False):
+        return None
+
+    for parent in Path(sys.executable).resolve().parents:
+        if parent.suffix == '.app':
+            return parent
+    return None
+
+
+def get_runtime_dir():
+    """返回用户可见、可写的数据目录"""
+    if not getattr(sys, 'frozen', False):
+        return BUNDLE_DIR
+
+    macos_app = get_macos_app_bundle()
+    if macos_app is not None:
+        return macos_app.parent
+
+    return Path(sys.executable).resolve().parent
+
+
+def resolve_bundle_file(filename):
+    """在不同平台的 PyInstaller 目录结构中查找资源文件"""
+    candidates = [BUNDLE_DIR / filename]
+
+    if getattr(sys, 'frozen', False):
+        executable_dir = Path(sys.executable).resolve().parent
+        candidates.append(executable_dir / filename)
+
+        macos_app = get_macos_app_bundle()
+        if macos_app is not None:
+            candidates.extend([
+                macos_app / 'Contents' / 'Resources' / filename,
+                macos_app / 'Contents' / 'MacOS' / filename,
+            ])
+
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[0]
+
+
 # 获取程序和资源目录
-BUNDLE_DIR = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-RUNTIME_DIR = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else BUNDLE_DIR
+BUNDLE_DIR = get_bundle_dir()
+RUNTIME_DIR = get_runtime_dir()
 
 
 def configure_windows_event_loop():
@@ -64,7 +113,7 @@ def start_streamlit():
     port = find_free_port()
 
     # 应用文件路径
-    app_path = BUNDLE_DIR / 'annotation_app.py'
+    app_path = resolve_bundle_file('annotation_app.py')
     work_dir = RUNTIME_DIR
 
     # 确保 videos 目录存在
