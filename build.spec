@@ -6,7 +6,7 @@ PyInstaller 配置文件
 
 import sys
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules, copy_metadata
 
 block_cipher = None
 
@@ -35,6 +35,13 @@ def safe_copy_metadata(package):
         return []
 
 
+def safe_collect_dynamic_libs(package):
+    try:
+        return collect_dynamic_libs(package)
+    except Exception:
+        return []
+
+
 datas = [
     ('annotation_app.py', '.'),
     ('config.json', '.'),
@@ -44,8 +51,13 @@ datas += safe_copy_metadata('streamlit')
 datas += safe_copy_metadata('altair')
 datas += safe_copy_metadata('pydeck')
 datas += safe_copy_metadata('pandas')
+datas += safe_copy_metadata('opencv-python-headless')
+
+binaries = []
+binaries += safe_collect_dynamic_libs('cv2')
 
 hiddenimports = [
+    'cv2',
     'pandas',
     'json',
     'datetime',
@@ -56,7 +68,7 @@ hiddenimports += safe_collect_submodules('streamlit')
 a = Analysis(
     ['launcher.py'],
     pathex=[str(current_dir)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],

@@ -33,6 +33,7 @@ BUNDLE_DIR = get_bundle_dir()
 DATA_DIR = get_data_dir()
 MAX_VIDEO_SCAN_DEPTH = 3
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv'}
+TAIL_FRAME_SEEK_OFFSETS = (1, 2, 5, 10, 30, 60, 120)
 
 # 页面配置
 st.set_page_config(
@@ -69,6 +70,13 @@ st.markdown("""
         margin-bottom: 0.3rem;
     }
     .video-container {
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 15px;
+        background-color: #f9f9f9;
+        margin-bottom: 1rem;
+    }
+    .frame-container {
         border: 2px solid #e0e0e0;
         border-radius: 10px;
         padding: 15px;
@@ -171,6 +179,74 @@ def save_annotation(video_name, annotations):
     annotation_file = DATA_DIR / "annotations.json"
     with open(annotation_file, 'w', encoding='utf-8') as f:
         json.dump(all_annotations, f, ensure_ascii=False, indent=2)
+
+
+@st.cache_data(show_spinner=False)
+def extract_tail_frame(video_path, modified_time, file_size):
+    """读取视频最后一个可解码帧，返回 RGB 图像数组"""
+    try:
+        import cv2
+    except ImportError:
+        return None, "缺少 opencv-python-headless，无法读取视频尾帧。"
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return None, "无法打开视频文件，尾帧读取失败。"
+
+    try:
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        frame = None
+
+        if frame_count > 0:
+            for offset in TAIL_FRAME_SEEK_OFFSETS:
+                start_index = max(frame_count - offset, 0)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, start_index)
+
+                candidate = None
+                while True:
+                    success, current_frame = cap.read()
+                    if not success or current_frame is None:
+                        break
+                    candidate = current_frame
+
+                if candidate is not None:
+                    frame = candidate
+                    break
+        else:
+            while True:
+                success, current_frame = cap.read()
+                if not success or current_frame is None:
+                    break
+                frame = current_frame
+
+        if frame is None:
+            return None, "未能读取到视频尾帧。"
+
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), None
+    finally:
+        cap.release()
+
+
+def render_tail_frame(video_path):
+    """渲染视频尾帧显示框"""
+    st.markdown('<div class="frame-container">', unsafe_allow_html=True)
+    st.subheader("🖼️ 视频尾帧")
+
+    if not video_path.exists():
+        st.warning("视频文件不存在，无法显示尾帧。")
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
+    stat = video_path.stat()
+    with st.spinner("正在读取视频尾帧..."):
+        tail_frame, error = extract_tail_frame(str(video_path), stat.st_mtime, stat.st_size)
+
+    if tail_frame is not None:
+        st.image(tail_frame, caption="最后一个可解码画面", channels="RGB", use_column_width=True)
+    else:
+        st.warning(error or "尾帧读取失败。")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def initialize_session_state():
@@ -342,6 +418,7 @@ def main():
                 st.video(video_bytes)
 
         st.markdown("</div>", unsafe_allow_html=True)
+        render_tail_frame(video_path)
 
     with col_anno:
         # 标注区
