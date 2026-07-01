@@ -31,6 +31,8 @@ def get_data_dir():
 
 BUNDLE_DIR = get_bundle_dir()
 DATA_DIR = get_data_dir()
+MAX_VIDEO_SCAN_DEPTH = 3
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv'}
 
 # 页面配置
 st.set_page_config(
@@ -126,19 +128,27 @@ def load_config():
         st.stop()
 
 
-def scan_videos():
-    """扫描视频目录"""
+def scan_videos(max_depth=MAX_VIDEO_SCAN_DEPTH):
+    """扫描 videos 目录及其子目录中的视频"""
     video_dir = DATA_DIR / "videos"
     video_dir.mkdir(exist_ok=True)
 
-    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
     videos = []
 
-    for file in video_dir.iterdir():
-        if file.suffix.lower() in video_extensions:
-            videos.append(file.name)
+    for root, dirs, files in os.walk(video_dir):
+        root_path = Path(root)
+        relative_root = root_path.relative_to(video_dir)
+        depth = 0 if relative_root == Path('.') else len(relative_root.parts)
 
-    return sorted(videos)
+        if depth >= max_depth:
+            dirs[:] = []
+
+        for filename in files:
+            file = root_path / filename
+            if file.suffix.lower() in VIDEO_EXTENSIONS:
+                videos.append(file.relative_to(video_dir).as_posix())
+
+    return sorted(videos, key=lambda name: name.lower())
 
 
 def load_annotations():
@@ -270,7 +280,7 @@ def main():
         st.info("""
         **使用说明：**
         1. 在当前目录下创建 `videos` 文件夹
-        2. 将手术视频文件放入该文件夹
+        2. 将手术视频文件放入该文件夹或其 3 级以内子文件夹
         3. 重新启动程序
 
         支持的视频格式：MP4, AVI, MOV, MKV, WMV
@@ -283,7 +293,7 @@ def main():
 
         all_annotations = load_annotations()
         total_videos = len(st.session_state.videos)
-        annotated_count = len(all_annotations)
+        annotated_count = sum(1 for video in st.session_state.videos if video in all_annotations)
         progress = annotated_count / total_videos if total_videos > 0 else 0
 
         st.metric("总视频数", total_videos)
@@ -322,7 +332,7 @@ def main():
 
     with col_video:
         # 视频播放区
-        video_path = DATA_DIR / "videos" / selected_video
+        video_path = DATA_DIR / "videos" / Path(selected_video)
         st.markdown('<div class="video-container">', unsafe_allow_html=True)
         st.subheader(f"🎥 {selected_video}")
 
