@@ -43,14 +43,20 @@ LEGACY_VALUE_MAPS = {
         '太远': '过远',
     },
     '距左腔壁': {
-        '危险': '即将接触',
-        '警告': '靠近',
-        '安全': '合适',
+        '危险': '高风险',
+        '警告': '中风险',
+        '安全': '低风险',
+        '即将接触': '高风险',
+        '靠近': '中风险',
+        '合适': '低风险',
     },
     '距右腔壁': {
-        '危险': '即将接触',
-        '警告': '靠近',
-        '安全': '合适',
+        '危险': '高风险',
+        '警告': '中风险',
+        '安全': '低风险',
+        '即将接触': '高风险',
+        '靠近': '中风险',
+        '合适': '低风险',
     },
 }
 LEGACY_FIELD_NAMES = {
@@ -357,7 +363,7 @@ def render_annotation_section(config, current_annotations, selected_video):
             "⬅️ 距左腔壁",
             cat,
             current_annotations,
-            '合适',
+            '低风险',
             widget_key(selected_video, 'risk_left')
         )
 
@@ -368,7 +374,7 @@ def render_annotation_section(config, current_annotations, selected_video):
             "➡️ 距右腔壁",
             cat,
             current_annotations,
-            '合适',
+            '低风险',
             widget_key(selected_video, 'risk_right')
         )
 
